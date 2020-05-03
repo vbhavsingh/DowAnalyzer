@@ -1,7 +1,12 @@
 import csv;
 import logging
 from datetime import datetime, timedelta, date
-from typing import re
+import argparse, sys
+
+parser=argparse.ArgumentParser()
+parser.add_argument('--file','-f', help='full path of the csv file', type= str, default= "sp500-10-year-daily-chart.csv")
+print(parser.format_help())
+args = parser.parse_args()
 
 logger = logging.getLogger('dow_analysis')
 logger.setLevel(logging.INFO)
@@ -15,7 +20,7 @@ index_data = []
 years_to_analyze = 7;
 date = datetime.today() - timedelta(days=years_to_analyze * 365);
 
-with open('sp500-10-year-daily-chart.csv') as index_data_file:
+with open(args.file) as index_data_file:
     csv_reader = csv.reader(index_data_file, delimiter=',')
     next(csv_reader)
     base_date=None
@@ -163,6 +168,12 @@ for this_index, current_pointer in enumerate(index_data, start=3):
     logger.debug("at index : "+str(this_index))
     if this_index >= len(index_data):
         continue
+    if look_for_valley and recent_top is not None and index_data[this_index]['price'] > recent_top['price']:
+        #look_for_mountain = True
+        #look_for_valley = False
+        logger.info("*** search for (^) mountain, price went above recent top : " + str(recent_top['price'])+", current price : "+str(index_data[this_index]['price']))
+        trend = "UP"
+        #continue
     if recent_bottom is None or look_for_valley:
         logger.debug("finding valley between (" + str(left_index) +", " + str(this_index) + ")")
         valley_bottom_details = searchForValley(left_index, this_index)
@@ -172,26 +183,19 @@ for this_index, current_pointer in enumerate(index_data, start=3):
                 trend = "UP"
             else:
                 trend = "DOWN"
-            recent_bottom = index_data[valley_bottom]
             look_for_mountain = True
             look_for_valley = False
             left_index = valley_bottom
             logger.info(getMessage(valley_bottom_details,this_index,trend,True))
+            recent_bottom = index_data[valley_bottom]
         else:
             continue
 
     if look_for_mountain and index_data[this_index]['price'] < recent_bottom['price']:
         look_for_mountain=False
         look_for_valley = True
-        logger.info("search for (v) valley, price went below recent bottom : "+str(recent_bottom['price'])+", current price : "+str(index_data[this_index]['price']))
+        logger.info("*** search for (v) valley, price went below recent bottom : "+str(recent_bottom['price'])+", current price : "+str(index_data[this_index]['price']))
         trend = "DOWN"
-        continue
-
-    if look_for_valley and recent_top is not None and index_data[this_index]['price'] > recent_top['price']:
-        look_for_mountain = True
-        look_for_valley = False
-        logger.info("search for (^) mountain, price went above recent top : " + str(recent_top['price'])+", current price : "+str(index_data[this_index]['price']))
-        trend = "UP"
         continue
 
     if look_for_mountain:
@@ -203,11 +207,11 @@ for this_index, current_pointer in enumerate(index_data, start=3):
                 trend = "UP"
             else:
                 trend = "DOWN"
-            recent_top = index_data[this_index]
             left_index = mountain_peak
             look_for_mountain = False
             look_for_valley = True
             logger.info(getMessage(mountain_peak_details, this_index, trend, False))
+            recent_top = index_data[mountain_peak]
         else:
             continue
 
