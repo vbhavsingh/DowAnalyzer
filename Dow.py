@@ -11,7 +11,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 index_data = []
-years_to_analyze = 3;
+years_to_analyze = 7;
 date = datetime.today() - timedelta(days=years_to_analyze * 365);
 
 with open('../sp500-10-year-daily-chart.csv') as index_data_file:
@@ -153,13 +153,13 @@ for this_index, current_pointer in enumerate(index_data, start=3):
         else:
             continue
 
-    if index_data[this_index]['price'] < recent_bottom['price']:
+    if look_for_mountain and index_data[this_index]['price'] < recent_bottom['price']:
         look_for_mountain=False
         look_for_valley = True
         logger.info("search for (v) valley, price went below recent bottom : "+str(recent_bottom['price'])+", current price : "+str(index_data[this_index]['price']))
         continue
 
-    if recent_top is not None and index_data[this_index]['price'] > recent_top['price']:
+    if look_for_valley and recent_top is not None and index_data[this_index]['price'] > recent_top['price']:
         look_for_mountain = True
         look_for_valley = False
         logger.info("search for (^) mountain, price went above recent top : " + str(recent_top['price'])+", current price : "+str(index_data[this_index]['price']))
@@ -175,6 +175,9 @@ for this_index, current_pointer in enumerate(index_data, start=3):
             look_for_valley = True
         else:
             continue
+
+print("recent_top : "+ str(recent_top))
+print("recent_bottom : "+ str(recent_bottom))
 
 
 
