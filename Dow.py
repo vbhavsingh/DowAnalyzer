@@ -1,6 +1,7 @@
 import csv;
 import logging
 from datetime import datetime, timedelta, date
+from typing import re
 
 logger = logging.getLogger('dow_analysis')
 logger.setLevel(logging.INFO)
@@ -69,7 +70,7 @@ def isMontainFound(a, c):
             mountain_index = i
     logger.debug("\t\t duration : "+str(duration)+" and difference "+ str(((max_price-mountain_base_price)/max_price)*100)+"%")
     if duration >=31 and mountain_base_price <=  max_price * 0.96:
-        logger.info("\t\t\tmountain found between : ("+str(a)+", "+str(c)+") bottom_day :"+str(mountain_index)+", max_price : "+str(max_price)+", base_price :"+str(mountain_base_price)+", date: "+index_data[mountain_index]['date'].strftime("%m/%d/%Y"))
+        logger.debug("\t\t\tmountain found between : ("+str(a)+", "+str(c)+") bottom_day :"+str(mountain_index)+", max_price : "+str(max_price)+", base_price :"+str(mountain_base_price)+", date: "+index_data[mountain_index]['date'].strftime("%m/%d/%Y"))
         return mountain_index
     return None
 
@@ -98,7 +99,7 @@ def isValleyFound(a, c):
             valley_index = i
     logger.debug("\t\t duration : "+str(duration)+" and differnce "+ str(((valley_top_price-min_price)/valley_top_price)*100)+"%")
     if duration >=31 and valley_top_price >=  min_price * 1.04:
-        logger.info("\t\t\tvalley found between : ("+str(a)+", "+str(c)+") bottom_day :"+str(valley_index)+", min_price : "+str(min_price)+", max_price :"+str(valley_top_price)+", date: "+index_data[valley_index]['date'].strftime("%m/%d/%Y"))
+        logger.debug("\t\t\tvalley found between : ("+str(a)+", "+str(c)+") bottom_day :"+str(valley_index)+", min_price : "+str(min_price)+", max_price :"+str(valley_top_price)+", date: "+index_data[valley_index]['date'].strftime("%m/%d/%Y"))
         return valley_index
     return None
 
@@ -121,7 +122,7 @@ def searchForValley(left_index, right_index):
         logger.debug("\t detreming whether there is valley between ("+str(index)+", "+str(right_index)+")")
         valley_bottom_index = isValleyFound(index,right_index)
         if valley_bottom_index is not None:
-            return valley_bottom_index
+            return [valley_bottom_index, index]
     return None
 
 def searchForMountain(left_index, right_index):
@@ -129,14 +130,34 @@ def searchForMountain(left_index, right_index):
         logger.debug("\t detreming whether there is mountain between ("+str(index)+", "+str(right_index)+")")
         mountain_top_index = isMontainFound(index,right_index)
         if mountain_top_index is not None:
-            return mountain_top_index
+            return [mountain_top_index, index]
     return None
+
+def getMessage(point_details,right_boundary,trend,isValley = True):
+    message = trend+" ->"
+    if isValley:
+        message = message + " Valley discovered "
+    else:
+        message = message + " Mountain discovered"
+    message = message + " at " + str(point_details[0])
+    message = message + " between ("+ str(point_details[1])+", "+str(right_boundary)+")"
+    message = message + " on " + index_data[point_details[0]]['date'].strftime("%m/%d/%Y")
+    if isValley:
+        message = message +". Valley bottom price : " + str(index_data[point_details[0]]['price'])
+    else:
+        message = message + ". Mountain top price : " + str(index_data[point_details[0]]['price'])
+    if recent_bottom is not None:
+        message = message +". Recent bottom was on " +recent_bottom['date'].strftime("%m/%d/%Y")+" at price : " + str(recent_bottom['price'])
+    if recent_top is not None:
+        message = message +". Recent top was on " +recent_top['date'].strftime("%m/%d/%Y")+" at price : " + str(recent_top['price'])
+    return message
 
 left_index = 0
 look_for_mountain = False
 look_for_valley = True
 recent_top = None
 recent_bottom = None
+trend = None
 
 for this_index, current_pointer in enumerate(index_data, start=3):
     logger.debug("at index : "+str(this_index))
@@ -144,12 +165,18 @@ for this_index, current_pointer in enumerate(index_data, start=3):
         continue
     if recent_bottom is None or look_for_valley:
         logger.debug("finding valley between (" + str(left_index) +", " + str(this_index) + ")")
-        valley_bottom = searchForValley(left_index, this_index)
-        if valley_bottom is not None:
+        valley_bottom_details = searchForValley(left_index, this_index)
+        if valley_bottom_details is not None:
+            valley_bottom = valley_bottom_details[0]
+            if recent_bottom is not None and index_data[valley_bottom]['price'] > recent_bottom['price']:
+                trend = "UP"
+            else:
+                trend = "DOWN"
             recent_bottom = index_data[valley_bottom]
             look_for_mountain = True
             look_for_valley = False
             left_index = valley_bottom
+            logger.info(getMessage(valley_bottom_details,this_index,trend,True))
         else:
             continue
 
@@ -157,27 +184,36 @@ for this_index, current_pointer in enumerate(index_data, start=3):
         look_for_mountain=False
         look_for_valley = True
         logger.info("search for (v) valley, price went below recent bottom : "+str(recent_bottom['price'])+", current price : "+str(index_data[this_index]['price']))
+        trend = "DOWN"
         continue
 
     if look_for_valley and recent_top is not None and index_data[this_index]['price'] > recent_top['price']:
         look_for_mountain = True
         look_for_valley = False
         logger.info("search for (^) mountain, price went above recent top : " + str(recent_top['price'])+", current price : "+str(index_data[this_index]['price']))
+        trend = "UP"
         continue
 
     if look_for_mountain:
         logger.debug("finding mountain between (" + str(left_index) + ", " + str(this_index) + ")")
-        mountain_peak = searchForMountain(left_index, this_index)
-        if mountain_peak is not None:
+        mountain_peak_details = searchForMountain(left_index, this_index)
+        if mountain_peak_details is not None:
+            mountain_peak = mountain_peak_details[0]
+            if recent_top is not None and index_data[mountain_peak]['price'] > recent_top['price']:
+                trend = "UP"
+            else:
+                trend = "DOWN"
             recent_top = index_data[this_index]
             left_index = mountain_peak
             look_for_mountain = False
             look_for_valley = True
+            logger.info(getMessage(mountain_peak_details, this_index, trend, False))
         else:
             continue
 
 print("recent_top : "+ str(recent_top))
 print("recent_bottom : "+ str(recent_bottom))
+print(trend)
 
 
 
