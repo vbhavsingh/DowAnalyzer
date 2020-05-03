@@ -15,7 +15,7 @@ index_data = []
 years_to_analyze = 7;
 date = datetime.today() - timedelta(days=years_to_analyze * 365);
 
-with open('../sp500-10-year-daily-chart.csv') as index_data_file:
+with open('sp500-10-year-daily-chart.csv') as index_data_file:
     csv_reader = csv.reader(index_data_file, delimiter=',')
     next(csv_reader)
     base_date=None
