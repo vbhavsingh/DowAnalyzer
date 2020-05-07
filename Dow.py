@@ -1,7 +1,9 @@
 import csv;
 import logging
 from datetime import datetime, timedelta, date
-import argparse, sys
+import argparse
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--file','-f', help='full path of the csv file', type= str, default= "sp500-10-year-daily-chart.csv")
@@ -17,7 +19,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 index_data = []
-years_to_analyze = 7;
+years_to_analyze = 20;
 date = datetime.today() - timedelta(days=years_to_analyze * 365);
 
 with open(args.file) as index_data_file:
@@ -163,6 +165,7 @@ look_for_valley = True
 recent_top = None
 recent_bottom = None
 trend = None
+chart_data=[]
 
 for this_index, current_pointer in enumerate(index_data, start=3):
     logger.debug("at index : "+str(this_index))
@@ -187,6 +190,7 @@ for this_index, current_pointer in enumerate(index_data, start=3):
             look_for_valley = False
             left_index = valley_bottom
             logger.info(getMessage(valley_bottom_details,this_index,trend,True))
+            chart_data.append([index_data[valley_bottom]['date'], index_data[valley_bottom]['price']])
             recent_bottom = index_data[valley_bottom]
         else:
             continue
@@ -211,13 +215,23 @@ for this_index, current_pointer in enumerate(index_data, start=3):
             look_for_mountain = False
             look_for_valley = True
             logger.info(getMessage(mountain_peak_details, this_index, trend, False))
+            chart_data.append([index_data[mountain_peak]['date'], index_data[mountain_peak]['price']])
             recent_top = index_data[mountain_peak]
         else:
             continue
 
 print("recent_top : "+ str(recent_top))
 print("recent_bottom : "+ str(recent_bottom))
-print(trend)
+
+chart_x = [e[0] for e in chart_data]
+chart_y = [e[1] for e in chart_data]
+
+plt.plot(chart_x,chart_y)
+# beautify the x-labels
+formatter = mdates.DateFormatter("%Y-%m-%d")
+plt.gca().xaxis.set_major_formatter(formatter)
+
+plt.show()
 
 
 
